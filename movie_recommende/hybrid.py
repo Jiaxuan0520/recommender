@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from content_based import content_based_filtering_enhanced, predict_content_ratings
+from content_based import content_based_filtering_enhanced
 from collaborative import collaborative_filtering_enhanced
 import warnings
 
@@ -11,21 +11,30 @@ warnings.filterwarnings('ignore')
 # == Functions for Streamlit App (main.py)
 # =====================================================================================
 
-def smart_hybrid_recommendation(user_id, movie_title, genre_input, df, ratings_df, top_n=10, content_weight=0.5, collab_weight=0.5):
+def smart_hybrid_recommendation(merged_df, movie_title, genre_input, top_n=10, content_weight=0.5, collab_weight=0.5):
     """
     Generates hybrid recommendations by combining content-based and collaborative (KNN) methods.
     """
 
     # 1. Content-Based Recommendations
-    content_recs = content_based_filtering_enhanced(movie_title, genre_input, df, top_n=len(df), genre_weight=0.3)
-    if content_recs.empty:
-        # fallback to collaborative only
-        return collaborative_filtering_enhanced(df, movie_title, top_n)
+    content_recs = content_based_filtering_enhanced(
+        merged_df,
+        movie_title if movie_title else None,
+        genre_input if genre_input else None,
+        top_n=len(merged_df)
+    )
+    if content_recs is None or content_recs.empty:
+        # Fallback to collaborative only if a movie title is provided
+        if movie_title:
+            return collaborative_filtering_enhanced(merged_df, movie_title, top_n)
+        return content_recs  # May be None/empty if neither method can produce results
 
     content_recs['content_score'] = range(len(content_recs), 0, -1)
 
     # 2. Collaborative Recommendations (KNN)
-    collab_recs = collaborative_filtering_enhanced(df, movie_title, top_n=len(df))
+    collab_recs = None
+    if movie_title:
+        collab_recs = collaborative_filtering_enhanced(merged_df, movie_title, top_n=len(merged_df))
     if collab_recs is None or collab_recs.empty:
         return content_recs.head(top_n)  # fallback to content-only
 
